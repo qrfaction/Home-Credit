@@ -159,10 +159,10 @@ def application_train_test(num_rows=None):
     df['days_employed_percentage'] = df['DAYS_EMPLOYED'] / df['DAYS_BIRTH']
     df['phone_to_birth_ratio'] = df['DAYS_LAST_PHONE_CHANGE'] / df['DAYS_BIRTH']
     df['phone_to_employ_ratio'] = df['DAYS_LAST_PHONE_CHANGE'] / df['DAYS_EMPLOYED']
-    df['cnt_non_child'] = df['CNT_FAM_MEMBERS'] - df['CNT_CHILDREN']
+    # df['cnt_non_child'] = df['CNT_FAM_MEMBERS'] - df['CNT_CHILDREN']
     df['credit_per_person'] = df['AMT_CREDIT'] / df['CNT_FAM_MEMBERS']
     df['credit_per_child'] = df['AMT_CREDIT'] / (1 + df['CNT_CHILDREN'])
-    df['credit_per_non_child'] = df['AMT_CREDIT'] / df['cnt_non_child']
+    df['credit_per_non_child'] = df['AMT_CREDIT'] / (df['CNT_FAM_MEMBERS'] - df['CNT_CHILDREN'])
 
     # Categorical features with Binary encode (0 or 1; two categories)
     for bin_feature in ['CODE_GENDER', 'FLAG_OWN_CAR', 'FLAG_OWN_REALTY']:
@@ -359,22 +359,15 @@ def bureau_and_balance(num_rows=None):
         'DAYS_CREDIT': ['mean','max'],   # last ,first <=> min max
         'AMT_CREDIT_SUM':['min','sum','first'],
         "AMT_CREDIT_SUM_DIFF":['max'],
-
         'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['max','last','median'],
         'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM_LIMIT':['median'],
-
         "DAYS_CREDIT_subtr_CREDIT_DAY_OVERDUE":['last'],
         # "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_ENDDATE":['last'],
         "DAYS_CREDIT_subtr_DAYS_CREDIT_ENDDATE":['max'],
-
         "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT":['max'],
-
         "DAYS_CREDIT_bin_7.0":['sum'],
-
         "MONTHS_BALANCE_VAR":['skew'],
-
         'AMT_ANNUITY': ['max', 'mean'],
-
     }
 
     active = bureau[bureau['CREDIT_ACTIVE_Active'] == 1]
@@ -403,7 +396,7 @@ def bureau_and_balance(num_rows=None):
     bureau_agg = bureau_agg.join(closed_agg, how='left', on='SK_ID_CURR')
 
 
-    ###  period  feature
+    ###  period2  feature
     aggregations = {
         'DAYS_CREDIT_ENDDATE': ['max',trend_feature_v2],
         'DAYS_CREDIT_DIFF': ['mean'],
@@ -414,9 +407,77 @@ def bureau_and_balance(num_rows=None):
     }
     bure_period_1 = bureau[bureau['DAYS_CREDIT']>=-760]
     bureau_agg_period1 = agg_parallel(bure_period_1,aggregations, mp.cpu_count())
-    bureau_agg_period1.columns = pd.Index(['BURO_PERIOD_' + e for e in bureau_agg_period1.columns])
+    bureau_agg_period1.columns = pd.Index(['BURO_PERIOD1_' + e for e in bureau_agg_period1.columns])
 
     bureau_agg = bureau_agg.join(bureau_agg_period1,how='left', on='SK_ID_CURR')
+
+    aggregations = {
+        'DAYS_CREDIT': ['var', 'median', 'max', 'min'],  # last ,first <=> min max
+        'DAYS_CREDIT_UPDATE': ['mean', 'median'],
+        'DAYS_ENDDATE_FACT': ['max', 'last', 'median'],
+        'DAYS_CREDIT_ENDDATE': ['sum', 'median', trend_feature, 'last'],
+        'AMT_CREDIT_MAX_OVERDUE': ['sum', 'max', 'median', 'mean'],
+        'AMT_CREDIT_SUM': ['max', 'sum', 'first', 'last', 'mean'],
+        'AMT_CREDIT_SUM_DEBT': ['max', 'sum', 'last'],
+        'AMT_CREDIT_SUM_OVERDUE': ['sum'],
+        'AMT_CREDIT_SUM_LIMIT': ['var'],
+
+        'AMT_ANNUITY': ['max', 'mean'],
+
+        'DAYS_CREDIT_DIFF': ['var', 'max', 'mean'],
+        "DAYS_CREDIT_ENDDATE_DIFF": ['max'],
+        'DAYS_CREDIT_UPDATE_DIFF': ['skew', 'last'],
+        "DAYS_ENDDATE_FACT_DIFF": ['mean'],
+        "AMT_CREDIT_SUM_DIFF": ['sum', 'var', 'max'],
+        "AMT_CREDIT_SUM_DEBT_DIFF": ['var', 'last'],
+
+        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM': ['max', 'mean', 'sum', 'last'],  # median
+        'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM_LIMIT': ['max'],
+        'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM': ['mean'],
+
+        "DAYS_CREDIT_subtr_CREDIT_DAY_OVERDUE": ['median', 'last', 'max', trend_feature, 'min'],
+        "DAYS_CREDIT_ENDDATE_subtr_DAYS_CREDIT_UPDATE": ['median', 'last', trend_feature_v2],
+        "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_ENDDATE": ['median', 'min'],
+        "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_UPDATE": ['median'],
+        "DAYS_CREDIT_subtr_DAYS_CREDIT_ENDDATE": ['last'],
+
+        "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT": ['max', 'sum', 'mean'],
+
+        "DAYS_ENDDATE_FACT_bin_nan": ['mean'],
+    }
+    ###  period1 feature
+    for col in aggregations.keys():
+        aggregations[col] = stat+[trend_feature_v2,trend_feature]
+
+    bure_period_1 = bureau[bureau['DAYS_CREDIT'] >= -365]
+    bureau_agg_period1 = agg_parallel(bure_period_1, aggregations, mp.cpu_count())
+    bureau_agg_period1.columns = pd.Index(['BURO_PERIOD1_' + e for e in bureau_agg_period1.columns])
+
+    bureau_agg = bureau_agg.join(bureau_agg_period1, how='left', on='SK_ID_CURR')
+
+
+    ###  period3 feature
+
+    for col in aggregations.keys():
+        aggregations[col] = stat+[trend_feature_v2,trend_feature]
+
+    aggregations = {
+        'DAYS_CREDIT_ENDDATE': ['max', trend_feature_v2],
+        'DAYS_CREDIT_DIFF': ['mean'],
+        'AMT_CREDIT_MAX_OVERDUE': ['sum', 'max', 'mean'],
+        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM': ['max', 'sum', 'median', trend_feature_v2],  # 'mean
+        'nan_count': ['sum', 'max', 'var', 'mean'],
+        "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT": ['last'],
+    }
+    bure_period_1 = bureau[bureau['DAYS_CREDIT'] >= -1500]
+    bureau_agg_period1 = agg_parallel(bure_period_1, aggregations, mp.cpu_count())
+    bureau_agg_period1.columns = pd.Index(['BURO_PERIOD3_' + e for e in bureau_agg_period1.columns])
+
+    bureau_agg = bureau_agg.join(bureau_agg_period1, how='left', on='SK_ID_CURR')
+
+
+
+
 
     for prefix in ['BURO_']:
 
@@ -432,6 +493,7 @@ def bureau_and_balance(num_rows=None):
         'BURO_CREDIT_ACTIVE_nan_MEAN',
         'BURO_CREDIT_TYPE_nan_MEAN',
         'BURO_CREDIT_ACTIVE_Sold_MEAN',
+        'BURO_CREDIT_TYPE_other_MEAN',
     ]
     bureau_agg.drop(useless_col,axis=1,inplace=True)
 
@@ -499,12 +561,12 @@ def previous_applications(num_rows=None):
 
         'AMT_ANNUITY': ['min'],
         'AMT_APPLICATION': ['skew'],
-        'AMT_CREDIT': ['first'],
+        'AMT_CREDIT': ['first',trend_feature],
         'AMT_DOWN_PAYMENT': ['sum','mean','median'],
         'AMT_GOODS_PRICE': ['first'],
-        'HOUR_APPR_PROCESS_START': ['max', 'mean','var'],
-        'DAYS_DECISION': ['mean','last'],
-        "SELLERPLACE_AREA":['mean'],
+        'HOUR_APPR_PROCESS_START': ['max', 'mean','var',trend_feature_v2],
+        'DAYS_DECISION': ['mean','last',trend_feature],
+        "SELLERPLACE_AREA":['mean',trend_feature],
         'CNT_PAYMENT': ['max','var'],
         # 'DAYS_FIRST_DRAWING': ['max'],
         'DAYS_FIRST_DUE': ['last'],
@@ -532,8 +594,6 @@ def previous_applications(num_rows=None):
 
         'nan_count': ['skew','var','median','sum'],
     }
-    for k in aggregations.keys():
-        aggregations[k] += [trend_feature_v2,trend_feature]
 
     useless_col =[
         'FLAG_LAST_APPL_PER_CONTRACT',
@@ -591,7 +651,6 @@ def previous_applications(num_rows=None):
         # 'DAYS_DECISION_subtr_DAYS_LAST_DUE_1ST_VERSION':['min'],
         'DAYS_FIRST_DUE_subtr_DAYS_TERMINATION':['sum'],
         'DAYS_LAST_DUE_1ST_VERSION_subtr_DAYS_LAST_DUE':['mean'],
-        'nan_count': stat,
     }
 
     approved = prev[prev['NAME_CONTRACT_STATUS_Approved'] == 1]
@@ -609,7 +668,7 @@ def previous_applications(num_rows=None):
         "AMT_CREDIT_DIFF":['max'],
         "AMT_CREDIT_divide_AMT_GOODS_PRICE":['max'],
         "CNT_PAYMENT_divide_AMT_GOODS_PRICE":['sum'],
-        'nan_count':stat,
+        'nan_count':['mean','var','sum','first','max'],
     }
 
     refused = prev[prev['NAME_CONTRACT_STATUS_Refused'] == 1]
@@ -645,6 +704,8 @@ def previous_applications(num_rows=None):
         'PREV_CODE_REJECT_REASON_SCOFR_MEAN',
         'PREV_CODE_REJECT_REASON_CLIENT_MEAN',
         'PREV_NAME_CONTRACT_STATUS_other_MEAN',
+        'PREV_CODE_REJECT_REASON_VERIF_MEAN',
+        'PREV_CODE_REJECT_REASON_LIMIT_MEAN',
     ]
     prev_agg.drop(useless_col,axis=1,inplace=True)
     return prev_agg
@@ -653,67 +714,40 @@ def previous_applications(num_rows=None):
 def pos_cash(num_rows=None):
 
     pos = pd.read_csv('./data/POS_CASH_balance.csv', nrows=num_rows)
-    # pos, cat_cols = one_hot_encoder(pos, nan_as_category=True)
 
     pos.sort_values(['SK_ID_CURR', 'MONTHS_BALANCE'], ascending=True, inplace=True)
-    pos['pos_cash_paid_late'] = (pos['SK_DPD'] > 0).astype(int)
-    pos['pos_cash_paid_late_with_tolerance'] = (pos['SK_DPD_DEF'] > 0).astype(int)
+
 
     pos['MONTHS_BALANCE_subtr_CNT_INSTALMENT_FUTURE'] = pos['MONTHS_BALANCE'] - pos['CNT_INSTALMENT_FUTURE']
     pos['MONTHS_BALANCE_subtr_CNT_INSTALMENT'] = pos['MONTHS_BALANCE'] - pos['CNT_INSTALMENT']
-    pos['CNT_INSTALMENT_subtr_CNT_INSTALMENT_FUTURE'] = pos['MONTHS_BALANCE'] - pos['CNT_INSTALMENT']
 
     gr = pos.groupby(by=['SK_ID_CURR'])
     cols = [
         'MONTHS_BALANCE',
         'CNT_INSTALMENT_FUTURE',
-        # 'SK_DPD',
+        'SK_DPD',
         'CNT_INSTALMENT',
+        'SK_DPD_DEF'
     ]
     pos = parallel_diff(pos, gr, cols)
 
-
     # Features
-    aggregations = {
-        'MONTHS_BALANCE': ['min','var'],
-        # 'SK_DPD': [trend_feature],
-        # 'SK_DPD_DEF': ['sum'],
-        'CNT_INSTALMENT_FUTURE': [ trend_feature, 'mean', 'max', 'var','last','sum'],
-        # 'CNT_INSTALMENT': ['last','skew'],
+    aggre = {
 
-        "MONTHS_BALANCE_DIFF":['sum','skew'],
-        'CNT_INSTALMENT_FUTURE_DIFF':['mean','skew','var'],
-        'CNT_INSTALMENT_DIFF':['var','mean'],
+        'MONTHS_BALANCE': [['sum',[None]],['first',[None]],['var',[None]]],
+        'SK_DPD': [['mean',[6]]],
+        'SK_DPD_DEF':[['var',[6,None]]],
+        'CNT_INSTALMENT_FUTURE': [[trend_feature,[6]],['mean',[6]],['max',[6]],['var',[None]],['sum',[6]]],
+        'CNT_INSTALMENT':[[trend_feature_v2,[None]]],
 
-        'MONTHS_BALANCE_subtr_CNT_INSTALMENT_FUTURE':['mean','sum','min','median'],
-        'MONTHS_BALANCE_subtr_CNT_INSTALMENT': ['mean'],
-        'CNT_INSTALMENT_subtr_CNT_INSTALMENT_FUTURE': ['mean'],
+        "MONTHS_BALANCE_DIFF":['sum'],
+        'CNT_INSTALMENT_FUTURE_DIFF':['var','mean'],
+        'CNT_INSTALMENT_DIFF':['mean'],
+
+        'MONTHS_BALANCE_subtr_CNT_INSTALMENT_FUTURE':[['mean',[6]],['sum',[6]],['min',[6]],['median',[6]]],
+        'MONTHS_BALANCE_subtr_CNT_INSTALMENT': [['mean',[6]]],
+        # 'CNT_INSTALMENT_subtr_CNT_INSTALMENT_FUTURE': ['mean'],
     }
-
-    trend_periods = [6,None]
-    agg_periods = [6,None]
-    aggre = {}
-    for k, features in aggregations.items():
-        aggre[k] = []
-        for v in features:
-            if 'DIFF' in k:
-                aggre[k].append((v,[None]))
-            elif v in [trend_feature_v2, trend_feature]:
-                aggre[k].append((v, trend_periods))
-            elif v in ['last', 'first','size']:
-                aggre[k].append((v, [None]))
-            else:
-                aggre[k].append((v, agg_periods))
-
-    # pre_cols = [
-    #     'MONTHS_BALANCE',
-    #     'CNT_INSTALMENT',
-    #     'CNT_INSTALMENT_FUTURE',
-    #     'SK_DPD',
-    #     'SK_DPD_DEF',
-    # ]
-    # pos, pre_cols = get_bin_feature(pos, pre_cols)
-    # aggre.update(pre_cols)
 
     usecol = ['Active','Completed']
     pos['NAME_CONTRACT_STATUS'] = pos['NAME_CONTRACT_STATUS'].apply(lambda x: 'other' if x not in usecol else x)
@@ -721,14 +755,16 @@ def pos_cash(num_rows=None):
     for c in pos_cat:
         aggre[c] = ['mean']
 
-    # pos_agg = pos.groupby('SK_ID_CURR').agg(aggregations)
     pos_agg = agg_parallel(pos,aggre,mp.cpu_count())
     pos_agg.columns = pd.Index(['POS_' + e for e in pos_agg.columns])
 
     pos_agg['POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
 
+    useless = [
+        'POS_NAME_CONTRACT_STATUS_nan_MEAN'
+    ]
+    pos_agg.drop(useless,axis=1,inplace=True)
     return pos_agg
-
 
 
 def installments_payments(num_rows=None):
@@ -931,10 +967,10 @@ def merge_data(debug=False):
     df = application_train_test(num_rows)
 
     feat_gen = {
-        'cred':1,
+        'cred':0,
         'ins':0,
         'bure':1,
-        'prev':1,
+        'prev':0,
         'pos':0,
 
     }

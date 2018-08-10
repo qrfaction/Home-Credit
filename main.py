@@ -62,15 +62,15 @@ def read_prepocess():
     tr.drop(['SK_ID_CURR','TARGET']+useless_col,axis=1,inplace=True)
     te.drop(['SK_ID_CURR',]+useless_col,axis=1,inplace=True)
 
-    score_feat = pd.read_csv("feat_importance.csv")
+    score_feat = pd.read_csv("feat_score.csv")
     score_feat = score_feat.sort_values(by=['importance2'],ascending=False)
     usecols = score_feat['name'].tolist()[:550]
     tr.columns = [col.replace(' ','_') for col in tr.columns]
     te.columns = [col.replace(' ','_') for col in te.columns]
     usecols += te_usecols
     usecols = list(set(usecols))
-    # tr = tr[usecols]
-    # te = te[usecols]
+    tr = tr[usecols]
+    te = te[usecols]
     print(tr.info())
     print(te.info())
     return tr,te,y
