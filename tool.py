@@ -245,6 +245,14 @@ def bureau_and_balance(num_rows=None):
 
     bureau['nan_count'] = bureau.isna().sum(axis=1)
 
+    nan_cols = []
+    for col in bureau.columns:
+        feat_ = bureau[col].isnull()
+        if feat_.sum() < 1:
+            continue
+        bureau[col+'_nan_count'] = feat_
+        nan_cols.append(col+'_nan_count')
+
     bureau["AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM"] = bureau["AMT_CREDIT_SUM_DEBT"] / bureau["AMT_CREDIT_SUM"]
     bureau["AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM_LIMIT"] = bureau["AMT_CREDIT_MAX_OVERDUE"] / bureau["AMT_CREDIT_SUM_LIMIT"]
     bureau["CNT_CREDIT_PROLONG_divide_AMT_CREDIT_MAX_OVERDUE"] = bureau["CNT_CREDIT_PROLONG"] / bureau[ "AMT_CREDIT_MAX_OVERDUE"]
@@ -348,6 +356,7 @@ def bureau_and_balance(num_rows=None):
 
     }
     for cat in bureau_cat: aggregations[cat] = ['mean']
+    for col in nan_cols: aggregations[col] = ['mean','sum','var']
 
     bureau_agg = agg_parallel(bureau,aggregations,mp.cpu_count())
     bureau_agg.columns = pd.Index(['BURO_' + e for e in bureau_agg.columns])
@@ -369,6 +378,7 @@ def bureau_and_balance(num_rows=None):
         "MONTHS_BALANCE_VAR":['skew'],
         'AMT_ANNUITY': ['max', 'mean'],
     }
+    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
 
     active = bureau[bureau['CREDIT_ACTIVE_Active'] == 1]
     active_agg = agg_parallel(active, aggregations, mp.cpu_count())
@@ -389,6 +399,7 @@ def bureau_and_balance(num_rows=None):
 
         'AMT_ANNUITY': ['max', 'mean'],
     }
+    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
 
     closed = bureau[bureau['CREDIT_ACTIVE_Closed'] == 1]
     closed_agg = agg_parallel(closed, aggregations, mp.cpu_count())
@@ -398,56 +409,30 @@ def bureau_and_balance(num_rows=None):
 
     ###  period2  feature
     aggregations = {
-        'DAYS_CREDIT_ENDDATE': ['max',trend_feature_v2],
+        'DAYS_CREDIT_ENDDATE': ['max',trend_feature_v2,'size'],
         'DAYS_CREDIT_DIFF': ['mean'],
         'AMT_CREDIT_MAX_OVERDUE': ['sum', 'max', 'mean'],
         'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['max','sum','median',trend_feature_v2], # 'mean
         'nan_count': ['sum','max','var','mean'],
         "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT":['last'],
     }
+    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
+
     bure_period_1 = bureau[bureau['DAYS_CREDIT']>=-760]
     bureau_agg_period1 = agg_parallel(bure_period_1,aggregations, mp.cpu_count())
-    bureau_agg_period1.columns = pd.Index(['BURO_PERIOD1_' + e for e in bureau_agg_period1.columns])
+    bureau_agg_period1.columns = pd.Index(['BURO_PERIOD2_' + e for e in bureau_agg_period1.columns])
 
     bureau_agg = bureau_agg.join(bureau_agg_period1,how='left', on='SK_ID_CURR')
 
-    aggregations = {
-        'DAYS_CREDIT': ['var', 'median', 'max', 'min'],  # last ,first <=> min max
-        'DAYS_CREDIT_UPDATE': ['mean', 'median'],
-        'DAYS_ENDDATE_FACT': ['max', 'last', 'median'],
-        'DAYS_CREDIT_ENDDATE': ['sum', 'median', trend_feature, 'last'],
-        'AMT_CREDIT_MAX_OVERDUE': ['sum', 'max', 'median', 'mean'],
-        'AMT_CREDIT_SUM': ['max', 'sum', 'first', 'last', 'mean'],
-        'AMT_CREDIT_SUM_DEBT': ['max', 'sum', 'last'],
-        'AMT_CREDIT_SUM_OVERDUE': ['sum'],
-        'AMT_CREDIT_SUM_LIMIT': ['var'],
 
-        'AMT_ANNUITY': ['max', 'mean'],
-
-        'DAYS_CREDIT_DIFF': ['var', 'max', 'mean'],
-        "DAYS_CREDIT_ENDDATE_DIFF": ['max'],
-        'DAYS_CREDIT_UPDATE_DIFF': ['skew', 'last'],
-        "DAYS_ENDDATE_FACT_DIFF": ['mean'],
-        "AMT_CREDIT_SUM_DIFF": ['sum', 'var', 'max'],
-        "AMT_CREDIT_SUM_DEBT_DIFF": ['var', 'last'],
-
-        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM': ['max', 'mean', 'sum', 'last'],  # median
-        'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM_LIMIT': ['max'],
-        'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM': ['mean'],
-
-        "DAYS_CREDIT_subtr_CREDIT_DAY_OVERDUE": ['median', 'last', 'max', trend_feature, 'min'],
-        "DAYS_CREDIT_ENDDATE_subtr_DAYS_CREDIT_UPDATE": ['median', 'last', trend_feature_v2],
-        "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_ENDDATE": ['median', 'min'],
-        "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_UPDATE": ['median'],
-        "DAYS_CREDIT_subtr_DAYS_CREDIT_ENDDATE": ['last'],
-
-        "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT": ['max', 'sum', 'mean'],
-
-        "DAYS_ENDDATE_FACT_bin_nan": ['mean'],
-    }
     ###  period1 feature
-    for col in aggregations.keys():
-        aggregations[col] = stat+[trend_feature_v2,trend_feature]
+    aggregations = {
+        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM': ['max','sum'],  # median
+        'AMT_CREDIT_SUM': ['min'],
+        'DAYS_CREDIT_ENDDATE': ['first','size'],
+        'AMT_CREDIT_SUM_DEBT': ['var','sum'],
+    }
+    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
 
     bure_period_1 = bureau[bureau['DAYS_CREDIT'] >= -365]
     bureau_agg_period1 = agg_parallel(bure_period_1, aggregations, mp.cpu_count())
@@ -458,25 +443,20 @@ def bureau_and_balance(num_rows=None):
 
     ###  period3 feature
 
-    for col in aggregations.keys():
-        aggregations[col] = stat+[trend_feature_v2,trend_feature]
-
     aggregations = {
-        'DAYS_CREDIT_ENDDATE': ['max', trend_feature_v2],
         'DAYS_CREDIT_DIFF': ['mean'],
-        'AMT_CREDIT_MAX_OVERDUE': ['sum', 'max', 'mean'],
-        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM': ['max', 'sum', 'median', trend_feature_v2],  # 'mean
-        'nan_count': ['sum', 'max', 'var', 'mean'],
-        "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT": ['last'],
+        'AMT_CREDIT_MAX_OVERDUE': ['sum','mean','max'],
+        'DAYS_CREDIT_ENDDATE': ['max',trend_feature_v2],
+        'nan_count':['mean','sum','var'],
     }
+    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
+
+
     bure_period_1 = bureau[bureau['DAYS_CREDIT'] >= -1500]
     bureau_agg_period1 = agg_parallel(bure_period_1, aggregations, mp.cpu_count())
     bureau_agg_period1.columns = pd.Index(['BURO_PERIOD3_' + e for e in bureau_agg_period1.columns])
 
     bureau_agg = bureau_agg.join(bureau_agg_period1, how='left', on='SK_ID_CURR')
-
-
-
 
 
     for prefix in ['BURO_']:
@@ -888,32 +868,6 @@ def credit_card_balance(num_rows=None):
     ]
     credit_card = parallel_diff(credit_card, groupby, cols)
 
-    # Features: Perform aggregations
-    aggregations = {
-        "AMT_DRAWINGS_ATM_CURRENT":['last'],
-        "CNT_DRAWINGS_ATM_CURRENT":['mean'],
-        "CNT_DRAWINGS_CURRENT":['max'],
-        "MONTHS_BALANCE":['size'],
-
-        "CNT_DRAWINGS_CURRENT_DIFF":['var'],
-
-        "AMT_RECIVABLE_divide_AMT_CREDIT_LIMIT_ACTUAL": ['last'],
-        'CNT_INSTALMENT_MATURE_CUM_divide_AMT_RECIVABLE': ['last'],
-        'AMT_RECIVABLE_divide_AMT_PAYMENT_TOTAL_CURRENT': ['median'],
-        "AMT_RECEIVABLE_PRINCIPAL_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
-        "AMT_PAYMENT_TOTAL_CURRENT_divide_AMT_RECEIVABLE_PRINCIPAL": ['median'],
-        "AMT_RECEIVABLE_PRINCIPAL_divide_AMT_PAYMENT_CURRENT": ['median'],
-        # "AMT_RECEIVABLE_PRINCIPAL_divide_CNT_INSTALMENT_MATURE_CUM": ['median','last'],
-        "AMT_BALANCE_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
-        "AMT_TOTAL_RECEIVABLE_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
-        "CNT_DRAWINGS_ATM_CURRENT_divide_CNT_INSTALMENT_MATURE_CUM": ['mean'],
-        'AMT_INST_MIN_REGULARITY_divide_AMT_CREDIT_LIMIT_ACTUAL': ['max','last'],
-        'CNT_DRAWINGS_POS_CURRENT_divide_AMT_DRAWINGS_POS_CURRENT':['median'],
-    }
-
-    cc_agg = agg_parallel(credit_card, aggregations, mp.cpu_count())
-    cc_agg.columns = pd.Index(['CC_' + e for e in cc_agg.columns])
-
     cols = [
         'AMT_BALANCE',
         'AMT_CREDIT_LIMIT_ACTUAL',
@@ -928,35 +882,80 @@ def credit_card_balance(num_rows=None):
         'AMT_RECIVABLE',
         'AMT_TOTAL_RECEIVABLE',
     ]
-    credit_card,cols = comb_feat(credit_card, cols, '+')
+    credit_card,_ = comb_feat(credit_card, cols, '+')
+    # Features: Perform aggregations
+    aggregations = {
+        "AMT_DRAWINGS_ATM_CURRENT":['mean','last'],
+        'AMT_RECIVABLE':['mean'],
+        "CNT_DRAWINGS_ATM_CURRENT":['mean'],
+        "CNT_DRAWINGS_CURRENT":['max'],
+        'AMT_DRAWINGS_CURRENT':['mean'],
+        'AMT_CREDIT_LIMIT_ACTUAL':['sum'],
+        "MONTHS_BALANCE":['size'],
+
+        "CNT_DRAWINGS_CURRENT_DIFF":['var'],
+
+        "AMT_RECIVABLE_divide_AMT_CREDIT_LIMIT_ACTUAL": ['last'],
+        'CNT_INSTALMENT_MATURE_CUM_divide_AMT_RECIVABLE': ['last'],
+        'AMT_RECIVABLE_divide_AMT_PAYMENT_TOTAL_CURRENT': ['median'],
+        "AMT_RECEIVABLE_PRINCIPAL_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
+        "AMT_PAYMENT_TOTAL_CURRENT_divide_AMT_RECEIVABLE_PRINCIPAL": ['median'],
+        "AMT_RECEIVABLE_PRINCIPAL_divide_AMT_PAYMENT_CURRENT": ['median'],
+        # "AMT_RECEIVABLE_PRINCIPAL_divide_CNT_INSTALMENT_MATURE_CUM": ['median','last'],
+        "AMT_BALANCE_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
+        "AMT_TOTAL_RECEIVABLE_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
+        "CNT_DRAWINGS_ATM_CURRENT_divide_CNT_INSTALMENT_MATURE_CUM": ['mean'],
+        'AMT_INST_MIN_REGULARITY_divide_AMT_CREDIT_LIMIT_ACTUAL': ['max'],
+        'CNT_DRAWINGS_POS_CURRENT_divide_AMT_DRAWINGS_POS_CURRENT':['median'],
+
+        'AMT_RECEIVABLE_PRINCIPAL_add_AMT_TOTAL_RECEIVABLE':['last'],
+    }
+    cc_agg = agg_parallel(credit_card, aggregations, mp.cpu_count())
+    cc_agg.columns = pd.Index(['CC_' + e for e in cc_agg.columns])
+
     # ----------          period1  --------------------------------------
     aggregations = {
         'CNT_DRAWINGS_ATM_CURRENT':['mean'],
-        'AMT_DRAWINGS_ATM_CURRENT':['max'],
+        'AMT_DRAWINGS_ATM_CURRENT':['max','var','mean'],
         'CNT_DRAWINGS_CURRENT':['mean'],
+        'AMT_INST_MIN_REGULARITY':['var'],
+        'AMT_DRAWINGS_CURRENT':['mean'],
     }
-
     credit_card_1 = credit_card[credit_card['MONTHS_BALANCE']>-12]
     credit_card_period1 = agg_parallel(credit_card_1, aggregations, mp.cpu_count())
     credit_card_period1.columns = pd.Index(['CC_PERIOD1_' + e for e in credit_card_period1.columns])
     cc_agg = cc_agg.join(credit_card_period1, how='left', on='SK_ID_CURR')
 
-
     # ----------          period2  --------------------------------------
     aggregations = {
         'CNT_DRAWINGS_ATM_CURRENT':['mean'],
         'CNT_DRAWINGS_CURRENT': ['var'],
-        'AMT_DRAWINGS_ATM_CURRENT_add_AMT_RECEIVABLE_PRINCIPAL':['median'],
-        'AMT_INST_MIN_REGULARITY_add_AMT_TOTAL_RECEIVABLE':['last'],
-        'AMT_BALANCE_add_AMT_DRAWINGS_ATM_CURRENT':['median'],
-        'AMT_DRAWINGS_ATM_CURRENT_add_AMT_INST_MIN_REGULARITY':['last'],
-        'AMT_RECEIVABLE_PRINCIPAL_add_AMT_RECIVABLE':['last'],
+        'AMT_DRAWINGS_ATM_CURRENT':['sum'],
+        'AMT_DRAWINGS_ATM_CURRENT_add_AMT_INST_MIN_REGULARITY': ['last'],
+        'AMT_DRAWINGS_CURRENT':['mean'],
+        'AMT_CREDIT_LIMIT_ACTUAL':['sum'],
+        'AMT_PAYMENT_CURRENT':['median'],
     }
     credit_card_2 = credit_card[credit_card['MONTHS_BALANCE']>-24]
     credit_card_period2 = agg_parallel(credit_card_2, aggregations, mp.cpu_count())
     credit_card_period2.columns = pd.Index(['CC_PERIOD2_' + e for e in credit_card_period2.columns])
     cc_agg = cc_agg.join(credit_card_period2, how='left', on='SK_ID_CURR')
 
+    # ----------          period3  --------------------------------------
+    aggregations = {
+        'CNT_DRAWINGS_CURRENT': ['var'],
+        'CNT_DRAWINGS_ATM_CURRENT': ['mean'],
+        'AMT_RECIVABLE':['mean','var'],
+        'AMT_PAYMENT_CURRENT':['median','sum','var'],
+        'AMT_PAYMENT_TOTAL_CURRENT':['median'],
+        'AMT_CREDIT_LIMIT_ACTUAL':['median'],
+        'AMT_INST_MIN_REGULARITY':['mean'],
+        'AMT_BALANCE':['mean'],
+    }
+    credit_card_2 = credit_card[credit_card['MONTHS_BALANCE'] > -48]
+    credit_card_period2 = agg_parallel(credit_card_2, aggregations, mp.cpu_count())
+    credit_card_period2.columns = pd.Index(['CC_PERIOD3_' + e for e in credit_card_period2.columns])
+    cc_agg = cc_agg.join(credit_card_period2, how='left', on='SK_ID_CURR')
 
     return cc_agg
 
