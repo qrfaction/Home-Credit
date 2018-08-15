@@ -320,25 +320,18 @@ def bureau_and_balance(num_rows=None):
 
         'AMT_ANNUITY': ['max', 'mean'],
 
-
         'DAYS_CREDIT_DIFF':['var','max','mean'],
         "DAYS_CREDIT_ENDDATE_DIFF": ['max'],
-        'DAYS_CREDIT_UPDATE_DIFF':['skew','last'],
+        'DAYS_CREDIT_UPDATE_DIFF':['last'],
         "DAYS_ENDDATE_FACT_DIFF":['mean'],
-        "AMT_CREDIT_SUM_DIFF":['sum','var','max'],
-        "AMT_CREDIT_SUM_DEBT_DIFF":['var','last'],
+        "AMT_CREDIT_SUM_DIFF":['sum','var'],
+        "AMT_CREDIT_SUM_DEBT_DIFF":['var'],
 
 
-        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['max','mean','sum','last'],   # median
-        'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM_LIMIT':['max'],
-        'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM':['mean'],
-
-
-        "DAYS_CREDIT_subtr_CREDIT_DAY_OVERDUE":['median','last','max',trend_feature,'min'],
-        "DAYS_CREDIT_ENDDATE_subtr_DAYS_CREDIT_UPDATE":['median','last',trend_feature_v2],
+        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['max','mean','last'],   # median
+        "DAYS_CREDIT_ENDDATE_subtr_DAYS_CREDIT_UPDATE":['median',trend_feature_v2],
         "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_ENDDATE":['median','min'],
         "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_UPDATE":['median'],
-        "DAYS_CREDIT_subtr_DAYS_CREDIT_ENDDATE":['last'],
 
         "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT":['max','sum','mean'],
 
@@ -354,9 +347,10 @@ def bureau_and_balance(num_rows=None):
         'MONTHS_BALANCE_VAR': ['mean'],
         'MONTHS_BALANCE_SIZE': ['sum'],
 
+        'DAYS_ENDDATE_FACT_nan_count':['mean'],
+        'DAYS_CREDIT_ENDDATE_nan_count':['var'],
     }
     for cat in bureau_cat: aggregations[cat] = ['mean']
-    for col in nan_cols: aggregations[col] = ['mean','sum','var']
 
     bureau_agg = agg_parallel(bureau,aggregations,mp.cpu_count())
     bureau_agg.columns = pd.Index(['BURO_' + e for e in bureau_agg.columns])
@@ -368,17 +362,19 @@ def bureau_and_balance(num_rows=None):
         'DAYS_CREDIT': ['mean','max'],   # last ,first <=> min max
         'AMT_CREDIT_SUM':['min','sum','first'],
         "AMT_CREDIT_SUM_DIFF":['max'],
-        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['max','last','median'],
+        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['last','median','max'],
         'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM_LIMIT':['median'],
         "DAYS_CREDIT_subtr_CREDIT_DAY_OVERDUE":['last'],
-        # "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_ENDDATE":['last'],
         "DAYS_CREDIT_subtr_DAYS_CREDIT_ENDDATE":['max'],
         "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT":['max'],
         "DAYS_CREDIT_bin_7.0":['sum'],
         "MONTHS_BALANCE_VAR":['skew'],
         'AMT_ANNUITY': ['max', 'mean'],
+
+        'AMT_CREDIT_SUM_DEBT_nan_count':['sum'],
+        'AMT_CREDIT_SUM_LIMIT_nan_count':['mean'],
+        'AMT_CREDIT_MAX_OVERDUE_nan_count':['mean'],
     }
-    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
 
     active = bureau[bureau['CREDIT_ACTIVE_Active'] == 1]
     active_agg = agg_parallel(active, aggregations, mp.cpu_count())
@@ -394,12 +390,13 @@ def bureau_and_balance(num_rows=None):
         "DAYS_CREDIT_subtr_CREDIT_DAY_OVERDUE":['first'],
         # "DAYS_CREDIT_subtr_DAYS_CREDIT_ENDDATE":['max'],
 
-        "MONTHS_BALANCE_LAST":['sum'],
         "MONTHS_BALANCE_MEAN": ['sum'],
 
         'AMT_ANNUITY': ['max', 'mean'],
+        'AMT_ANNUITY_nan_count':['sum'],
+        'AMT_CREDIT_SUM_LIMIT_nan_count':['var','mean'],
+        'AMT_CREDIT_SUM_DEBT_nan_count':['mean'],
     }
-    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
 
     closed = bureau[bureau['CREDIT_ACTIVE_Closed'] == 1]
     closed_agg = agg_parallel(closed, aggregations, mp.cpu_count())
@@ -409,14 +406,15 @@ def bureau_and_balance(num_rows=None):
 
     ###  period2  feature
     aggregations = {
-        'DAYS_CREDIT_ENDDATE': ['max',trend_feature_v2,'size'],
+        'DAYS_CREDIT_ENDDATE': ['max','size'],
         'DAYS_CREDIT_DIFF': ['mean'],
         'AMT_CREDIT_MAX_OVERDUE': ['sum', 'max', 'mean'],
-        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['max','sum','median',trend_feature_v2], # 'mean
+        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['sum','median'], # 'mean
         'nan_count': ['sum','max','var','mean'],
-        "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT":['last'],
+        'DAYS_ENDDATE_FACT_nan_count':['sum'],
+        'AMT_CREDIT_SUM_DEBT_nan_count':['sum'],
+        'DAYS_CREDIT_ENDDATE_nan_count':['mean'],
     }
-    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
 
     bure_period_1 = bureau[bureau['DAYS_CREDIT']>=-760]
     bureau_agg_period1 = agg_parallel(bure_period_1,aggregations, mp.cpu_count())
@@ -427,12 +425,11 @@ def bureau_and_balance(num_rows=None):
 
     ###  period1 feature
     aggregations = {
-        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM': ['max','sum'],  # median
+        'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM': ['sum'],  # median
         'AMT_CREDIT_SUM': ['min'],
         'DAYS_CREDIT_ENDDATE': ['first','size'],
         'AMT_CREDIT_SUM_DEBT': ['var','sum'],
     }
-    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
 
     bure_period_1 = bureau[bureau['DAYS_CREDIT'] >= -365]
     bureau_agg_period1 = agg_parallel(bure_period_1, aggregations, mp.cpu_count())
@@ -444,13 +441,12 @@ def bureau_and_balance(num_rows=None):
     ###  period3 feature
 
     aggregations = {
-        'DAYS_CREDIT_DIFF': ['mean'],
-        'AMT_CREDIT_MAX_OVERDUE': ['sum','mean','max'],
-        'DAYS_CREDIT_ENDDATE': ['max',trend_feature_v2],
+        'AMT_CREDIT_MAX_OVERDUE': ['mean','max'],
         'nan_count':['mean','sum','var'],
+        'DAYS_CREDIT_ENDDATE_nan_count':['mean'],
+        'DAYS_ENDDATE_FACT_nan_count':['mean','var'],
+        'AMT_CREDIT_MAX_OVERDUE_nan_count':['var'],
     }
-    for col in nan_cols: aggregations[col] = ['mean', 'sum', 'var']
-
 
     bure_period_1 = bureau[bureau['DAYS_CREDIT'] >= -1500]
     bureau_agg_period1 = agg_parallel(bure_period_1, aggregations, mp.cpu_count())
@@ -460,9 +456,6 @@ def bureau_and_balance(num_rows=None):
 
 
     for prefix in ['BURO_']:
-
-        bureau_agg[prefix+'debt_credit_ratio'] = \
-            bureau_agg[prefix+'AMT_CREDIT_SUM_DEBT_SUM'] / bureau_agg[prefix+'AMT_CREDIT_SUM_SUM']
 
         bureau_agg[prefix + 'credit_active_ratio'] = \
             bureau_agg[prefix + 'CREDIT_ACTIVE_Active_MEAN'] / bureau_agg[prefix + 'CREDIT_ACTIVE_Closed_MEAN']
@@ -491,8 +484,16 @@ def previous_applications(num_rows=None):
     prev['DAYS_LAST_DUE'].replace(365243, np.nan, inplace=True)
     prev['DAYS_TERMINATION'].replace(365243, np.nan, inplace=True)
 
-
+    nan_cols = []
+    for col in prev.columns:
+        feat_ = prev[col].isnull()
+        if feat_.sum() < 1:
+            continue
+        prev[col + '_nan_count'] = feat_
+        nan_cols.append(col + '_nan_count')
     prev['nan_count'] = prev.isna().sum(axis=1)
+
+
     prev["AMT_CREDIT_divide_AMT_GOODS_PRICE"] = prev["AMT_CREDIT"] / prev["AMT_GOODS_PRICE"]
     prev["AMT_GOODS_PRICE_divide_AMT_CREDIT"] = prev["AMT_GOODS_PRICE"] / prev["AMT_CREDIT"]
     prev["AMT_DOWN_PAYMENT_divide_AMT_CREDIT"] = prev["AMT_DOWN_PAYMENT"] / prev["AMT_CREDIT"]
@@ -535,7 +536,6 @@ def previous_applications(num_rows=None):
     ]
     prev = parallel_diff(prev, gr, cols)
 
-
     # Previous applications numeric features
     aggregations = {
 
@@ -563,7 +563,6 @@ def previous_applications(num_rows=None):
         "AMT_GOODS_PRICE_divide_CNT_PAYMENT":['min'],
         # "AMT_CREDIT_divide_CNT_PAYMENT":['last'],
 
-
         'DAYS_LAST_DUE_1ST_VERSION_subtr_DAYS_TERMINATION':['last'],
         'DAYS_LAST_DUE_1ST_VERSION_subtr_DAYS_LAST_DUE':['mean'],
 
@@ -573,7 +572,17 @@ def previous_applications(num_rows=None):
         'PRODUCT_COMBINATION': ['last'],
 
         'nan_count': ['skew','var','median','sum'],
+        'DAYS_LAST_DUE_nan_count':['mean'],
+        'NAME_TYPE_SUITE_nan_count':['mean','var'],
+
+        'DAYS_TERMINATION_nan_count':['mean'],
+        'NFLAG_INSURED_ON_APPROVAL_nan_count':['var'],
+        'RATE_DOWN_PAYMENT_nan_count':['mean'],
+        'DAYS_FIRST_DUE_nan_count':['sum'],
+
+        # 'DAYS_LAST_DUE_1ST_VERSION_nan_count':['mean'],     线下不咋变  线上降
     }
+
 
     useless_col =[
         'FLAG_LAST_APPL_PER_CONTRACT',
@@ -628,9 +637,12 @@ def previous_applications(num_rows=None):
         "AMT_ANNUITY_divide_CNT_PAYMENT":['last'],
 
         'DAYS_LAST_DUE_1ST_VERSION_subtr_DAYS_TERMINATION':['last','median'],
-        # 'DAYS_DECISION_subtr_DAYS_LAST_DUE_1ST_VERSION':['min'],
         'DAYS_FIRST_DUE_subtr_DAYS_TERMINATION':['sum'],
         'DAYS_LAST_DUE_1ST_VERSION_subtr_DAYS_LAST_DUE':['mean'],
+
+
+        'DAYS_FIRST_DRAWING_nan_count':['sum','var'],
+        'NAME_TYPE_SUITE_nan_count':['mean'],
     }
 
     approved = prev[prev['NAME_CONTRACT_STATUS_Approved'] == 1]
@@ -648,7 +660,10 @@ def previous_applications(num_rows=None):
         "AMT_CREDIT_DIFF":['max'],
         "AMT_CREDIT_divide_AMT_GOODS_PRICE":['max'],
         "CNT_PAYMENT_divide_AMT_GOODS_PRICE":['sum'],
-        'nan_count':['mean','var','sum','first','max'],
+
+        'nan_count':['mean','var','sum','max'],
+        'RATE_DOWN_PAYMENT_nan_count':['mean','sum'],
+        'NAME_TYPE_SUITE_nan_count':['sum'],
     }
 
     refused = prev[prev['NAME_CONTRACT_STATUS_Refused'] == 1]
@@ -684,6 +699,9 @@ def previous_applications(num_rows=None):
         'PREV_CODE_REJECT_REASON_SCOFR_MEAN',
         'PREV_CODE_REJECT_REASON_CLIENT_MEAN',
         'PREV_NAME_CONTRACT_STATUS_other_MEAN',
+        'PREV_CODE_REJECT_REASON_VERIF_MEAN',
+        'PREV_CODE_REJECT_REASON_LIMIT_MEAN',
+        'PREV_NAME_CLIENT_TYPE_Repeater_MEAN',
         'PREV_CODE_REJECT_REASON_VERIF_MEAN',
         'PREV_CODE_REJECT_REASON_LIMIT_MEAN',
     ]
@@ -826,6 +844,14 @@ def credit_card_balance(num_rows=None):
     credit_card = pd.read_csv('./data/credit_card_balance.csv', nrows=num_rows)
     # General aggregations
 
+    nan_cols = []
+    for col in credit_card.columns:
+        feat_ = credit_card[col].isnull()
+        if feat_.sum() < 1:
+            continue
+        credit_card[col + '_nan_count'] = feat_
+        nan_cols.append(col + '_nan_count')
+    credit_card['nan_count'] = credit_card.isna().sum(axis=1)
 
     credit_card["AMT_RECIVABLE_divide_AMT_CREDIT_LIMIT_ACTUAL"] = \
         credit_card["AMT_RECIVABLE"]/credit_card["AMT_CREDIT_LIMIT_ACTUAL"]
@@ -839,23 +865,14 @@ def credit_card_balance(num_rows=None):
     credit_card['AMT_TOTAL_RECEIVABLE_divide_AMT_CREDIT_LIMIT_ACTUAL'] = \
         credit_card["AMT_TOTAL_RECEIVABLE"] / credit_card["AMT_CREDIT_LIMIT_ACTUAL"]
 
-    credit_card['CNT_DRAWINGS_ATM_CURRENT_divide_CNT_INSTALMENT_MATURE_CUM'] = \
-        credit_card["CNT_DRAWINGS_ATM_CURRENT"] / credit_card["CNT_INSTALMENT_MATURE_CUM"]
-
     credit_card['AMT_PAYMENT_TOTAL_CURRENT_divide_AMT_RECEIVABLE_PRINCIPAL'] = \
         credit_card["AMT_PAYMENT_TOTAL_CURRENT"] / credit_card["AMT_RECEIVABLE_PRINCIPAL"]
 
     credit_card['AMT_RECEIVABLE_PRINCIPAL_divide_AMT_PAYMENT_CURRENT'] = \
         credit_card["AMT_RECEIVABLE_PRINCIPAL"] / credit_card["AMT_PAYMENT_CURRENT"]
 
-    credit_card['CNT_INSTALMENT_MATURE_CUM_divide_AMT_RECIVABLE'] = \
-        credit_card["CNT_INSTALMENT_MATURE_CUM"] / credit_card["AMT_RECIVABLE"]
-
     credit_card['AMT_RECIVABLE_divide_AMT_PAYMENT_TOTAL_CURRENT'] = \
         credit_card["AMT_RECIVABLE"] / credit_card["AMT_PAYMENT_TOTAL_CURRENT"]
-
-    credit_card['AMT_INST_MIN_REGULARITY_divide_AMT_CREDIT_LIMIT_ACTUAL'] = \
-        credit_card["AMT_INST_MIN_REGULARITY"] / credit_card["AMT_CREDIT_LIMIT_ACTUAL"]
 
     credit_card['CNT_DRAWINGS_POS_CURRENT_divide_AMT_DRAWINGS_POS_CURRENT'] = \
         credit_card["CNT_DRAWINGS_POS_CURRENT"] / credit_card["AMT_DRAWINGS_POS_CURRENT"]
@@ -896,19 +913,17 @@ def credit_card_balance(num_rows=None):
         "CNT_DRAWINGS_CURRENT_DIFF":['var'],
 
         "AMT_RECIVABLE_divide_AMT_CREDIT_LIMIT_ACTUAL": ['last'],
-        'CNT_INSTALMENT_MATURE_CUM_divide_AMT_RECIVABLE': ['last'],
         'AMT_RECIVABLE_divide_AMT_PAYMENT_TOTAL_CURRENT': ['median'],
         "AMT_RECEIVABLE_PRINCIPAL_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
-        "AMT_PAYMENT_TOTAL_CURRENT_divide_AMT_RECEIVABLE_PRINCIPAL": ['median'],
         "AMT_RECEIVABLE_PRINCIPAL_divide_AMT_PAYMENT_CURRENT": ['median'],
-        # "AMT_RECEIVABLE_PRINCIPAL_divide_CNT_INSTALMENT_MATURE_CUM": ['median','last'],
+        "AMT_PAYMENT_TOTAL_CURRENT_divide_AMT_RECEIVABLE_PRINCIPAL": ['median'],
+
         "AMT_BALANCE_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
         "AMT_TOTAL_RECEIVABLE_divide_AMT_CREDIT_LIMIT_ACTUAL":['last'],
-        "CNT_DRAWINGS_ATM_CURRENT_divide_CNT_INSTALMENT_MATURE_CUM": ['mean'],
-        'AMT_INST_MIN_REGULARITY_divide_AMT_CREDIT_LIMIT_ACTUAL': ['max'],
         'CNT_DRAWINGS_POS_CURRENT_divide_AMT_DRAWINGS_POS_CURRENT':['median'],
-
-        'AMT_RECEIVABLE_PRINCIPAL_add_AMT_TOTAL_RECEIVABLE':['last'],
+        'nan_count':['var'],
+        'AMT_PAYMENT_CURRENT_nan_count':['var',trend_feature_v2],
+        'CNT_INSTALMENT_MATURE_CUM_nan_count':['var'],
     }
     cc_agg = agg_parallel(credit_card, aggregations, mp.cpu_count())
     cc_agg.columns = pd.Index(['CC_' + e for e in cc_agg.columns])
@@ -931,7 +946,6 @@ def credit_card_balance(num_rows=None):
         'CNT_DRAWINGS_ATM_CURRENT':['mean'],
         'CNT_DRAWINGS_CURRENT': ['var'],
         'AMT_DRAWINGS_ATM_CURRENT':['sum'],
-        'AMT_DRAWINGS_ATM_CURRENT_add_AMT_INST_MIN_REGULARITY': ['last'],
         'AMT_DRAWINGS_CURRENT':['mean'],
         'AMT_CREDIT_LIMIT_ACTUAL':['sum'],
         'AMT_PAYMENT_CURRENT':['median'],
@@ -951,6 +965,7 @@ def credit_card_balance(num_rows=None):
         'AMT_CREDIT_LIMIT_ACTUAL':['median'],
         'AMT_INST_MIN_REGULARITY':['mean'],
         'AMT_BALANCE':['mean'],
+        'AMT_PAYMENT_CURRENT_nan_count':['var'],
     }
     credit_card_2 = credit_card[credit_card['MONTHS_BALANCE'] > -48]
     credit_card_period2 = agg_parallel(credit_card_2, aggregations, mp.cpu_count())
@@ -968,8 +983,8 @@ def merge_data(debug=False):
     feat_gen = {
         'cred':0,
         'ins':0,
-        'bure':1,
-        'prev':0,
+        'bure':0,
+        'prev':1,
         'pos':0,
 
     }

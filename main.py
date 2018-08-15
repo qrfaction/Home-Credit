@@ -64,11 +64,13 @@ def read_prepocess():
 
     score_feat = pd.read_csv("feat_score.csv")
     score_feat = score_feat.sort_values(by=['importance2'],ascending=False)
-    usecols = score_feat['name'].tolist()[:550]
+    usecols = score_feat['name'].tolist()[:570]
     tr.columns = [col.replace(' ','_') for col in tr.columns]
     te.columns = [col.replace(' ','_') for col in te.columns]
-    usecols += te_usecols
-    usecols = list(set(usecols))
+    # usecols += te_usecols
+    # usecols = list(set(usecols))
+    usecols = [col for col in usecols if col not in useless_col]
+
     tr = tr[usecols]
     te = te[usecols]
     print(tr.info())
