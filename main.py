@@ -3,6 +3,7 @@ import numpy as np
 import json
 import os
 from imblearn.over_sampling import SMOTE
+from config import useless_col
 
 def read_prepocess():
 
@@ -58,7 +59,6 @@ def read_prepocess():
 
 
     y = tr['TARGET'].astype(int)
-    from config import useless_col
     tr.drop(['SK_ID_CURR','TARGET']+useless_col,axis=1,inplace=True)
     te.drop(['SK_ID_CURR',]+useless_col,axis=1,inplace=True)
 
@@ -167,7 +167,9 @@ def train(tr,te,y,num_folds,over_sample=False):
 
     Submission = pd.read_csv("./data/sample_submission.csv")
     Submission['TARGET'] = sub_preds.copy()
-    Submission.to_csv("sample_submission.csv", index=False)
+    file = "sample_submission.csv"
+    print(file)
+    Submission.to_csv(file, index=False)
 
     print('save oof ')
 

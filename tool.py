@@ -305,35 +305,34 @@ def bureau_and_balance(num_rows=None):
     ]
     bureau,bin_cols = get_bin_feature(bureau,bin_cols)
 
-
     bureau.drop(['SK_ID_BUREAU'], axis=1, inplace=True)
     aggregations = {
-        'DAYS_CREDIT': ['var','median','max','min'],   # last ,first <=> min max
+        'DAYS_CREDIT': ['var','median','max','min'],   # last ,first <=> min max    lb gain = cv gain
         'DAYS_CREDIT_UPDATE': ['mean', 'median'],
-        'DAYS_ENDDATE_FACT':['max','last','median'],
-        'DAYS_CREDIT_ENDDATE': ['sum','median',trend_feature,'last'],
-        'AMT_CREDIT_MAX_OVERDUE':['sum','max','median','mean'],
-        'AMT_CREDIT_SUM':['max','sum','first','last','mean'],
-        'AMT_CREDIT_SUM_DEBT':['max','sum','last'],
+        'DAYS_ENDDATE_FACT':['max','last','median'],                      #   lb gain > cv gain
+        'DAYS_CREDIT_ENDDATE': ['sum','median',trend_feature,'last'],     #   lb gain = cv gain
+        'AMT_CREDIT_MAX_OVERDUE':['sum','max','median','mean'],           #   lb gain > cv gain
+        'AMT_CREDIT_SUM':['max','sum','first','last','mean'],             #   lb gain > cv gain
+        'AMT_CREDIT_SUM_DEBT':['max','sum','last'],                      #   lb gain > cv gain
         'AMT_CREDIT_SUM_OVERDUE':['sum'],
         'AMT_CREDIT_SUM_LIMIT':['var'],
 
         'AMT_ANNUITY': ['max', 'mean'],
 
-        'DAYS_CREDIT_DIFF':['var','max','mean'],
+        'DAYS_CREDIT_DIFF':['var','max','mean'],        #   lb gain > cv gain
         "DAYS_CREDIT_ENDDATE_DIFF": ['max'],
         'DAYS_CREDIT_UPDATE_DIFF':['last'],
         "DAYS_ENDDATE_FACT_DIFF":['mean'],
         "AMT_CREDIT_SUM_DIFF":['sum','var'],
-        "AMT_CREDIT_SUM_DEBT_DIFF":['var'],
+        "AMT_CREDIT_SUM_DEBT_DIFF":['var'],             #   lb gain > cv gain
 
 
         'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['max','mean','last'],   # median
-        "DAYS_CREDIT_ENDDATE_subtr_DAYS_CREDIT_UPDATE":['median',trend_feature_v2],
+        "DAYS_CREDIT_ENDDATE_subtr_DAYS_CREDIT_UPDATE":['median',trend_feature_v2],  #   lb gain = cv gain
         "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_ENDDATE":['median','min'],
-        "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_UPDATE":['median'],
+        "CREDIT_DAY_OVERDUE_subtr_DAYS_CREDIT_UPDATE":['median'],                    #   lb gain > cv gain
 
-        "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT":['max','sum','mean'],
+        "AMT_CREDIT_MAX_OVERDUE_add_AMT_CREDIT_SUM_DEBT":['max','sum','mean'],        #   lb gain > cv gain
 
         "DAYS_CREDIT_bin_7.0":['sum'],
         "DAYS_ENDDATE_FACT_bin_nan":['mean'],
@@ -356,12 +355,18 @@ def bureau_and_balance(num_rows=None):
     bureau_agg.columns = pd.Index(['BURO_' + e for e in bureau_agg.columns])
 
 
+    feat_ = [
+        'AMT_CREDIT_SUM',
+        'AMT_CREDIT_SUM_DEBT',
+        'DAYS_ENDDATE_FACT',
+    ]
     ###  ----------------------------------active ---------------------------------------------------
 
     aggregations = {
         'DAYS_CREDIT': ['mean','max'],   # last ,first <=> min max
-        'AMT_CREDIT_SUM':['min','sum','first'],
+        'AMT_CREDIT_SUM':['min','sum','first','max','median'],
         "AMT_CREDIT_SUM_DIFF":['max'],
+        # 'AMT_CREDIT_SUM_DEBT':['last','sum','min','mean'],         # lb-   cv=
         'AMT_CREDIT_SUM_DEBT_divide_AMT_CREDIT_SUM':['last','median','max'],
         'AMT_CREDIT_MAX_OVERDUE_divide_AMT_CREDIT_SUM_LIMIT':['median'],
         "DAYS_CREDIT_subtr_CREDIT_DAY_OVERDUE":['last'],
@@ -375,7 +380,6 @@ def bureau_and_balance(num_rows=None):
         'AMT_CREDIT_SUM_LIMIT_nan_count':['mean'],
         'AMT_CREDIT_MAX_OVERDUE_nan_count':['mean'],
     }
-
     active = bureau[bureau['CREDIT_ACTIVE_Active'] == 1]
     active_agg = agg_parallel(active, aggregations, mp.cpu_count())
     active_agg.columns = pd.Index(['ACTIVE_' + e for e in active_agg.columns])
@@ -385,7 +389,8 @@ def bureau_and_balance(num_rows=None):
 
     aggregations = {
         'DAYS_CREDIT': ['min'],   # last ,first <=> min max
-        'AMT_CREDIT_SUM':['median','sum','first'],
+        'AMT_CREDIT_SUM':['mean','sum','first','max'],
+        'DAYS_ENDDATE_FACT': ['last', 'sum', 'min', 'var','max'],
         'DAYS_CREDIT_DIFF':['sum','mean','last'],
         "DAYS_CREDIT_subtr_CREDIT_DAY_OVERDUE":['first'],
         # "DAYS_CREDIT_subtr_DAYS_CREDIT_ENDDATE":['max'],
@@ -397,7 +402,6 @@ def bureau_and_balance(num_rows=None):
         'AMT_CREDIT_SUM_LIMIT_nan_count':['var','mean'],
         'AMT_CREDIT_SUM_DEBT_nan_count':['mean'],
     }
-
     closed = bureau[bureau['CREDIT_ACTIVE_Closed'] == 1]
     closed_agg = agg_parallel(closed, aggregations, mp.cpu_count())
     closed_agg.columns = pd.Index(['CLOSED_' + e for e in closed_agg.columns])
@@ -983,8 +987,8 @@ def merge_data(debug=False):
     feat_gen = {
         'cred':0,
         'ins':0,
-        'bure':0,
-        'prev':1,
+        'bure':1,
+        'prev':0,
         'pos':0,
 
     }
