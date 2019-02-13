@@ -7,8 +7,6 @@ import pandas as pd
 
 
 
-
-
 def trend_feature(feature_col,return_pred):
     y = feature_col.values
     try:
